@@ -1,13 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
 	"time"
 )
 
-const depth = 10
+const depth = 4
 
 var randSeed = rand.NewSource(time.Now().UnixNano())
 var randGen = rand.New(randSeed)
@@ -28,15 +29,15 @@ func chargeFilesStats(fileName string, markovProba map[string]int) error {
 	n, err := f.Read(chain[depth-1:])
 	for ; err == nil && n == 1; n, err = f.Read(chain[depth-1:]) {
 		markovProba[string(chain[0:])]++
-			for i := 1; i < depth; i++ {
-				chain[i-1] = chain[i]
-			}
+		for i := 1; i < depth; i++ {
+			chain[i-1] = chain[i]
+		}
 	}
 
 	return nil
 }
 
-func nextLetter(markovProba map[string]int, precLetters [depth - 1]byte) byte {
+func nextLetter(markovProba map[string]int, precLetters [depth - 1]byte) (byte, error) {
 	var max int
 	var tmp [depth]byte
 
@@ -50,7 +51,7 @@ func nextLetter(markovProba map[string]int, precLetters [depth - 1]byte) byte {
 	}
 
 	if max == 0 {
-		return 0
+		return 0, errors.New("precLetters absent from markovProba")
 	}
 	r := randGen.Intn(max) + 1
 
@@ -58,11 +59,11 @@ func nextLetter(markovProba map[string]int, precLetters [depth - 1]byte) byte {
 		tmp[depth-1] = byte(i)
 		r -= markovProba[string(tmp[0:])]
 		if r <= 0 && markovProba[string(tmp[0:])] != 0 {
-			return byte(i)
+			return byte(i), nil
 		}
 	}
 
-	return 0
+	return 0, errors.New("precLetters absent from markovProba")
 }
 
 func main() {
@@ -86,9 +87,9 @@ func main() {
 		letter[i] = '\n'
 	}
 	for {
-		newLetter := nextLetter(markovProba, letter)
-		if newLetter == 0 {
-			break;
+		newLetter, err := nextLetter(markovProba, letter)
+		if err != nil {
+			break
 		}
 		for i := 1; i < depth-1; i++ {
 			letter[i-1] = letter[i]
